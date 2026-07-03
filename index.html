@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高级蓝牙智能控制中心 v5.1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>高级蓝牙智能控制中心 v5.2</title>
     <style>
         :root {
             --primary: #007aff;
@@ -14,13 +14,25 @@
             --card: #ffffff;
             --text: #1c1c1e;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 10px; font-size: 14px; box-sizing: border-box; }
+        /* 核心：通过 touch-action 禁用手机双击缩放，防止干扰事件 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            padding: 10px; 
+            font-size: 14px; 
+            box-sizing: border-box;
+            touch-action: manipulation; 
+            -webkit-user-select: none; /* 优化手机长按体验，防止弹出系统选择文字框 */
+            user-select: none;
+        }
         .card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
         .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
         .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
         .grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-        input, select, button { padding: 10px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 13px; outline: none; box-sizing: border-box; }
+        input, select, button { padding: 10px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 13px; outline: none; box-sizing: border-box; -webkit-user-select: text; user-select: text; }
         input[type="text"] { flex: 1; min-width: 60px; }
         button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
         button:active { opacity: 0.7; }
@@ -34,23 +46,23 @@
         .status-bar.connected { background: #e3f9e5; color: var(--success); }
         
         .display-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 10px 6px; text-align: center; position: relative; }
-        .display-title { font-size: 11px; color: #8e8e93; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; cursor: pointer; user-select: none; }
-        .display-title::after { content: " ✏️"; font-size: 9px; opacity: 0.4; }
+        .display-title { font-size: 11px; color: #8e8e93; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; cursor: pointer; }
+        .display-title::after { content: " ✏️"; font-size: 9px; opacity: 0.5; }
         .display-val { font-size: 20px; font-weight: bold; color: var(--primary); margin-top: 6px; min-height: 24px; word-break: break-all; }
         
         .led-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 8px 4px; text-align: center; }
         .led-title { font-size: 10px; color: #8e8e93; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        .led-title::after { content: "✏️"; font-size: 8px; opacity: 0.4; margin-left: 2px; }
         .led { width: 24px; height: 24px; border-radius: 50%; background: #d1d1d6; margin: 0 auto; box-shadow: inset 0 2px 4px rgba(0,0,0,0.15); transition: all 0.3s; }
         .led.on { background: var(--success); box-shadow: 0 0 12px var(--success), inset 0 1px 2px rgba(255,255,255,0.6); }
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
-        .modal-content { background: white; border-radius: 16px; padding: 16px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); animation: slideUp 0.2s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-content { background: white; border-radius: 16px; padding: 16px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .modal-header { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #333; display: flex; justify-content: space-between; align-items: center; }
         
         .collapse-log { margin-top: 15px; }
         .collapse-header { background: #e5e5ea; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .collapse-body { display: none; background: #1c1c1e; color: #00ff66; font-family: monospace; height: 150px; overflow-y: auto; padding: 8px; border-radius: 0 0 8px 8px; font-size: 11px; line-height: 1.4; border-top: 1px solid #333; }
+        .collapse-body { display: none; background: #1c1c1e; color: #00ff66; font-family: monospace; height: 150px; overflow-y: auto; padding: 8px; border-radius: 0 0 8px 8px; font-size: 11px; line-height: 1.4; border-top: 1px solid #333; -webkit-user-select: text; user-select: text; }
         .log-tx { color: #5eaeff; }
         .log-err { color: var(--danger); font-weight: bold; }
         .log-sys { color: var(--warning); }
@@ -63,12 +75,12 @@
 
 <div id="statusBar" class="status-bar disconnected">🔴 状态：未连接蓝牙设备</div>
 
-<!-- 主连接卡片 (增加了一键重连按钮) -->
+<!-- 主连接卡片 -->
 <div class="card">
     <div class="row">
         <input type="text" id="filterName" placeholder="筛选设备名(如 NBH,可空)">
         <button id="connectBtn" class="success">🔍 搜索连接</button>
-        <button id="reconnectBtn" class="warning">⚡ 一键重连上次设备</button>
+        <button id="reconnectBtn" class="warning">⚡ 一键重连</button>
         <button id="disconnectBtn" class="danger">断开</button>
     </div>
     <div class="row" style="margin-bottom: 0; margin-top: 4px;">
@@ -77,31 +89,31 @@
     </div>
 </div>
 
-<!-- 📊 数据监视 -->
+<!-- 📊 数据监视 （修改为手机端支持长按或点击改名） -->
 <div class="card">
-    <h3>📊 数据实时监视器 <span style="font-size: 10px; color:#999; font-weight:normal;">(双击别名可修改)</span></h3>
+    <h3>📊 数据实时监视器 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上长按或点击标题改名)</span></h3>
     <div class="grid-3">
-        <div class="display-box"><div class="display-title" id="t_v0" ondblclick="renameItem('t_v0')">数据 1</div><div class="display-val" id="v0">-</div></div>
-        <div class="display-box"><div class="display-title" id="t_v1" ondblclick="renameItem('t_v1')">数据 2</div><div class="display-val" id="v1">-</div></div>
-        <div class="display-box"><div class="display-title" id="t_v2" ondblclick="renameItem('t_v2')">数据 3</div><div class="display-val" id="v2">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v0">数据 1</div><div class="display-val" id="v0">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v1">数据 2</div><div class="display-val" id="v1">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v2">数据 3</div><div class="display-val" id="v2">-</div></div>
     </div>
     <div class="grid-3">
-        <div class="display-box"><div class="display-title" id="t_v3" ondblclick="renameItem('t_v3')">数据 4</div><div class="display-val" id="v3">-</div></div>
-        <div class="display-box"><div class="display-title" id="t_v4" ondblclick="renameItem('t_v4')">数据 5</div><div class="display-val" id="v4">-</div></div>
-        <div class="display-box"><div class="display-title" id="t_v5" ondblclick="renameItem('t_v5')">数据 6</div><div class="display-val" id="v5">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v3">数据 4</div><div class="display-val" id="v3">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v4">数据 5</div><div class="display-val" id="v4">-</div></div>
+        <div class="display-box"><div class="display-title touch-rename" id="t_v5">数据 6</div><div class="display-val" id="v5">-</div></div>
     </div>
 </div>
 
 <!-- 🔴 大号状态指示灯 -->
 <div class="card">
-    <h3>🚨 状态指示灯群 <span style="font-size: 10px; color:#999; font-weight:normal;">(双击别名可修改)</span></h3>
+    <h3>🚨 状态指示灯群 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上长按或点击标题改名)</span></h3>
     <div class="grid-6">
-        <div class="led-box"><div class="led-title" id="t_l0" ondblclick="renameItem('t_l0')">开关1</div><div class="led" id="l0"></div></div>
-        <div class="led-box"><div class="led-title" id="t_l1" ondblclick="renameItem('t_l1')">开关2</div><div class="led" id="l1"></div></div>
-        <div class="led-box"><div class="led-title" id="t_l2" ondblclick="renameItem('t_l2')">开关3</div><div class="led" id="l2"></div></div>
-        <div class="led-box"><div class="led-title" id="t_l3" ondblclick="renameItem('t_l3')">开关4</div><div class="led" id="l3"></div></div>
-        <div class="led-box"><div class="led-title" id="t_l4" ondblclick="renameItem('t_l4')">开关5</div><div class="led" id="l4"></div></div>
-        <div class="led-box"><div class="led-title" id="t_l5" ondblclick="renameItem('t_l5')">开关6</div><div class="led" id="l5"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l0">开关1</div><div class="led" id="l0"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l1">开关2</div><div class="led" id="l1"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l2">开关3</div><div class="led" id="l2"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l3">开关4</div><div class="led" id="l3"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l4">开关5</div><div class="led" id="l4"></div></div>
+        <div class="led-box"><div class="led-title touch-rename" id="t_l5">开关6</div><div class="led" id="l5"></div></div>
     </div>
 </div>
 
@@ -201,8 +213,9 @@ function toggleLogArea() {
     document.getElementById('arrowIndicator').innerText = isLogExpanded ? '收起 ∨' : '展开 ＞';
 }
 
+// 统一手机和电脑的重命名触发函数
 function renameItem(id) {
-    let oldName = document.getElementById(id).innerText;
+    let oldName = document.getElementById(id).innerText.replace(" ✏️","").replace("✏️","").trim();
     let newName = prompt("请输入新的显示别名:", oldName);
     if(newName && newName.trim() !== "") {
         document.getElementById(id).innerText = newName.trim();
@@ -214,7 +227,6 @@ window.onload = function() {
     if(localStorage.getItem('filterName')) document.getElementById('filterName').value = localStorage.getItem('filterName');
     if(localStorage.getItem('parseRule')) document.getElementById('parseRule').value = localStorage.getItem('parseRule');
     
-    // 智能去死缓存判断逻辑：本地如果没存过，就使用 HTML 默认的 FFF0 段
     if(localStorage.getItem('uuidService')) document.getElementById('uuidService').value = localStorage.getItem('uuidService');
     if(localStorage.getItem('uuidNotify')) document.getElementById('uuidNotify').value = localStorage.getItem('uuidNotify');
     if(localStorage.getItem('uuidWrite')) document.getElementById('uuidWrite').value = localStorage.getItem('uuidWrite');
@@ -226,6 +238,18 @@ window.onload = function() {
 
     let savedCmds = JSON.parse(localStorage.getItem('shortcuts')) || [{name: "查询状态", cmd: "AT"}];
     savedCmds.forEach(item => createCmdRow(item.name, item.cmd));
+
+    // 绑定手机端点击和长按改名事件（解决双击导致缩放放大的Bug）
+    document.querySelectorAll('.touch-rename').forEach(el => {
+        let timer = null;
+        // 1. 支持直接点击改名
+        el.addEventListener('click', () => { renameItem(el.id); });
+        // 2. 同时也支持长按改名
+        el.addEventListener('touchstart', () => {
+            timer = setTimeout(() => { renameItem(el.id); }, 600);
+        });
+        el.addEventListener('touchend', () => { clearTimeout(timer); });
+    });
 };
 
 function saveUUIDs() {
@@ -243,7 +267,7 @@ function saveScript() {
 }
 
 connectBtn.addEventListener('click', () => doConnect(false));
-reconnectBtn.addEventListener('click', () => doConnect(true)); // 一键重连触发
+reconnectBtn.addEventListener('click', () => doConnect(true));
 disconnectBtn.addEventListener('click', disconnectDevice);
 sendBtn.addEventListener('click', () => sendData(txInput.value));
 
@@ -257,47 +281,28 @@ async function doConnect(isReconnect = false) {
 
     writeChara = null; 
     notifyChara = null;
-    updateStatus('connecting', '🟡 正在唤起蓝牙重连/搜索中...');
+    updateStatus('connecting', '🟡 正在唤起蓝牙链路中...');
 
     try {
         if (isReconnect) {
-            // 【核心重连智能升级】：拉取该网页历史配对过的所有设备
-            if (!navigator.bluetooth.getDevices) {
-                throw new Error("当前浏览器或系统内核不支持历史设备检索，请使用 [搜索连接] 功能。");
-            }
-            log("正在检索历史配对记录...", "sys");
-            const devices = await navigator.bluetooth.getDevices();
-            
-            if (devices.length === 0) {
-                throw new Error("没有找到任何上一次配对的缓存设备，请先使用 [搜索连接] 配对一次。");
+            log("正在尝试检索浏览器配对历史...", "sys");
+            let devices = [];
+            // 规避部分 iOS 浏览器缺失 API 的报错
+            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+                devices = await navigator.bluetooth.getDevices();
             }
             
-            // 智能分流判定
-            if (devices.length === 1) {
-                // 只有一个设备时，别废话直接连
-                bleDevice = devices[0];
-                log(`发现唯一历史设备: ${bleDevice.name || '未知设备'}，开始连接...`, "sys");
+            // 【核心重连优化：智能降级兜底】
+            if (devices && devices.length > 0) {
+                bleDevice = devices[0]; 
+                log(`在缓存中发现历史设备: ${bleDevice.name || '未知设备'}，正在直接握手...`, "sys");
             } else {
-                // 有多个设备时，弹出提示框让用户自己选，再也不盲连了！
-                let msg = "检测到多个历史配对设备，请输入序号选择要连接哪一个：\n\n";
-                devices.forEach((dev, index) => {
-                    msg += `【${index + 1}】 ${dev.name || '未命名设备'} (ID: ${dev.id.substring(0,8)}...)\n`;
-                });
-                
-                let choice = prompt(msg, "1");
-                if (choice === null) { 
-                    updateStatus('disconnected', '🔴 用户取消了重连');
-                    log("重连操作已被你手动取消。", "sys");
-                    return; 
-                }
-                
-                let idx = parseInt(choice) - 1;
-                if (isNaN(idx) || idx < 0 || idx >= devices.length) {
-                    throw new Error("别闹，输入的序号不正确，重连终止。");
-                }
-                
-                bleDevice = devices[idx];
-                log(`已确认！你选择了设备 【${choice}】: ${bleDevice.name || '未知设备'}`, "sys");
+                // 如果浏览器说历史记录为空或者没弹窗权限，绝不报错卡死，直接原地转为“正常弹窗搜索”
+                log("⚠️ 缓存列表为空或当前环境受限，已自动为您唤起标准搜索窗口...", "sys");
+                let options = { optionalServices: [serviceUUID] };
+                if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
+                else { options.acceptAllDevices = true; }
+                bleDevice = await navigator.bluetooth.requestDevice(options);
             }
         } else {
             // 正常搜索流程
