@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>高级蓝牙智能控制中心 v5.3</title>
+    <title>高级蓝牙智能控制中心 v5.5</title>
     <style>
         :root {
             --primary: #007aff;
@@ -77,9 +77,9 @@
 <!-- 主连接卡片 -->
 <div class="card">
     <div class="row">
-        <input type="text" id="filterName" placeholder="筛选设备名(如 NBH,可空)">
+        <input type="text" id="filterName" placeholder="筛选设备名(可空)">
         <button id="connectBtn" class="success">🔍 搜索连接</button>
-        <button id="reconnectBtn" class="warning">⚡ 极速重连</button>
+        <button id="reconnectBtn" class="warning">⚡ 强制重连</button>
         <button id="disconnectBtn" class="danger">断开</button>
     </div>
     <div class="row" style="margin-bottom: 0; margin-top: 4px;">
@@ -156,7 +156,7 @@
         <div class="modal-header"><span>🧠 编写实时解析脚本</span><span style="cursor:pointer;" onclick="closeModal('scriptModal')">✕</span></div>
         <div style="font-size:11px; color:#666; margin-bottom:6px; line-height:1.3;">
             支持变量：<code style="color:blue;">text</code>(原始文本)、<code style="color:blue;">json</code>(若为JSON格式)。<br>
-            范例：<code style="background:#eee;padding:1px 3px;">v0=json.temp; l0=json.status==1;</code>
+            范例：<code style="background:#eee;padding:1px 3px;">v0=json.temp; l0=json.status==1; Barra</code>
         </div>
         <textarea id="parseRule" style="width:100%; height:160px; font-family:monospace; font-size:12px; padding:8px; border:1px solid #d1d1d6; border-radius:8px; box-sizing:border-box; outline:none; resize:none; background:#fafafa;"></textarea>
         <button class="success" onclick="saveScript()" style="width:100%; margin-top:10px;">💾 保存解析规则</button>
@@ -224,7 +224,6 @@ function renameItem(id) {
 window.onload = function() {
     if(localStorage.getItem('filterName')) document.getElementById('filterName').value = localStorage.getItem('filterName');
     if(localStorage.getItem('parseRule')) document.getElementById('parseRule').value = localStorage.getItem('parseRule');
-    
     if(localStorage.getItem('uuidService')) document.getElementById('uuidService').value = localStorage.getItem('uuidService');
     if(localStorage.getItem('uuidNotify')) document.getElementById('uuidNotify').value = localStorage.getItem('uuidNotify');
     if(localStorage.getItem('uuidWrite')) document.getElementById('uuidWrite').value = localStorage.getItem('uuidWrite');
@@ -262,12 +261,11 @@ function saveScript() {
 }
 
 connectBtn.addEventListener('click', () => doConnect(false));
-reconnectBtn.addEventListener('click', () => doConnect(true)); // 触发重连
+reconnectBtn.addEventListener('click', () => doConnect(true)); // 点击重连触发强刷
 disconnectBtn.addEventListener('click', disconnectDevice);
 sendBtn.addEventListener('click', () => sendData(txInput.value));
 
-async function doConnect(isReconnect = false) {
-    // 【核心修复：重连前全力清洗底层链路，防止 iOS 占用死锁】
+async function doConnect(isForceFlush = false) {
     if (bleDevice) {
         log("清理上一次残留的硬件句柄...", "sys");
         try { if(bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch(e){}
@@ -282,22 +280,26 @@ async function doConnect(isReconnect = false) {
     const notifyUUID = document.getElementById('uuidNotify').value.trim().toLowerCase();
     const writeUUID = document.getElementById('uuidWrite').value.trim().toLowerCase();
 
-    updateStatus('connecting', '🟡 正在拉起系统蓝牙安全面板...');
+    updateStatus('connecting', '🟡 正在破解系统蓝牙死锁...');
 
     try {
         let options = { optionalServices: [serviceUUID] };
-        
-        // 【极速重连底层精髓】：如果是点击重连，自动锁定当前已有筛选，100%强制唤出安全弹窗
-        if (isReconnect && nameFilter) {
-            log(`极速重连锁定前缀: [${nameFilter}]`, "sys");
-            options.filters = [{ namePrefix: nameFilter }];
-        } else if (nameFilter) {
-            options.filters = [{ namePrefix: nameFilter }];
-        } else {
+
+        // 【核心修改点：多UUID队列强刷破局逻辑】
+        if (isForceFlush) {
+            log("🔥 正在向系统注入随机虚拟 UUID，强行冲刷 iOS 蓝牙挂起队列...", "sys");
+            // 生成一个完全随机的虚拟 Service UUID，逼迫 Webkit 浏览器内核重置底层扫描缓存
+            const randomUUID = '0000' + Math.floor(Math.random()*65535).toString(16).padStart(4,'0') + '-0000-1000-8000-00805f9b34fb';
+            options.optionalServices.push(randomUUID);
+            
+            // 撤销一切名称过滤，直接使用“全局通搜模式”强撕系统弹窗
             options.acceptAllDevices = true;
+        } else {
+            if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
+            else { options.acceptAllDevices = true; }
         }
 
-        // 强行弹窗，让系统重置广播发现队列
+        // 强行弹窗
         bleDevice = await navigator.bluetooth.requestDevice(options);
 
         updateStatus('connecting', `🟡 正在握手通道: ${bleDevice.name || '设备'}...`);
@@ -325,7 +327,7 @@ async function doConnect(isReconnect = false) {
         }
         
         updateStatus('connected', `🟢 已连接: ${bleDevice.name || '蓝牙设备'}`);
-        log(`🎉 链路自愈完成，已进入就绪状态！`, "sys");
+        log(`🎉 冲锁成功，链路完全架设就绪！`, "sys");
 
     } catch (error) {
         updateStatus('disconnected', `🔴 连接已终止`);
@@ -388,7 +390,7 @@ function executeParseRule(fullBuffer, incomingStr) {
 }
 
 function disconnectDevice() {
-    log("正在全力切断底层蓝牙链路...", "sys");
+    log("切断网页端蓝牙链路...", "sys");
     if (notifyChara) {
         try { notifyChara.removeEventListener('characteristicvaluechanged', handleDataReceived); } catch(e){}
         notifyChara = null;
@@ -403,7 +405,7 @@ function disconnectDevice() {
 
 function onDisconnected() {
     updateStatus('disconnected', '🔴 状态：未连接蓝牙设备');
-    log("提示：底层链路已安全断开，允许重新捕获。", "sys");
+    log("提示：网页端链路已重置。", "sys");
     writeChara = null; notifyChara = null; bleDevice = null;
 }
 
