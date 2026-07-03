@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高级网页蓝牙调试助手 v2.0</title>
+    <title>万能自适应蓝牙调试助手 v4.0</title>
     <style>
         :root {
             --primary: #007aff;
@@ -14,99 +14,60 @@
             --card: #ffffff;
             --text: #1c1c1e;
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 10px;
-            font-size: 14px;
-        }
-        .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 10px; font-size: 14px; }
+        .card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h3 { margin: 0 0 10px 0; font-size: 15px; color: #333; border-left: 4px solid var(--primary); padding-left: 6px; }
         .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
         .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        input, select, button {
-            padding: 8px;
-            border: 1px solid #d1d1d6;
-            border-radius: 6px;
-            font-size: 13px;
-            outline: none;
-            box-sizing: border-box;
-        }
+        input, select, button { padding: 8px; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 13px; outline: none; box-sizing: border-box; }
         input[type="text"] { flex: 1; min-width: 60px; }
         button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
         button:active { opacity: 0.8; }
         button.danger { background: var(--danger); }
         button.success { background: var(--success); }
-        
-        /* 状态条 */
-        .status-bar {
-            padding: 8px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            margin-bottom: 10px;
-            background: #e5e5ea;
-        }
+        .status-bar { padding: 8px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; background: #e5e5ea; }
         .status-bar.disconnected { background: #ffe3e3; color: var(--danger); }
         .status-bar.connecting { background: #fff1cc; color: var(--warning); }
         .status-bar.connected { background: #e3f9e5; color: var(--success); }
-
-        /* 状态灯与窗口 */
         .display-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 8px; padding: 6px; text-align: center; }
         .display-title { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .display-val { font-size: 16px; font-weight: bold; color: var(--primary); margin: 4px 0; min-height: 20px; }
         .led { width: 12px; height: 12px; border-radius: 50%; background: #aeaeae; margin: 0 auto; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
         .led.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
-
-        /* 日志区 */
-        .log-area {
-            background: #1c1c1e; color: #00ff66; font-family: monospace; 
-            height: 180px; overflow-y: auto; padding: 8px; border-radius: 8px; 
-            font-size: 12px; line-height: 1.4; margin-bottom: 6px;
-        }
+        .log-area { background: #1c1c1e; color: #00ff66; font-family: monospace; height: 180px; overflow-y: auto; padding: 8px; border-radius: 8px; font-size: 12px; line-height: 1.4; margin-bottom: 6px; }
         .log-tx { color: #5eaeff; }
         .log-err { color: var(--danger); font-weight: bold; }
         .log-sys { color: var(--warning); }
-
-        /* 快捷指令 */
         .cmd-item { display: flex; gap: 6px; margin-bottom: 6px; width: 100%; }
         .cmd-btn { min-width: 70px; background: #e5e5ea; color: var(--text); font-weight: normal; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
-        
         label { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+        .custom-uuid-panel { display: none; background: #f2f2f7; padding: 8px; border-radius: 8px; width: 100%; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<!-- 状态提示条 -->
 <div id="statusBar" class="status-bar disconnected">🔴 状态：未连接蓝牙设备</div>
 
-<!-- 1. 连接与配置区 -->
 <div class="card">
-    <h3>📡 蓝牙连接控制</h3>
+    <h3>📡 蓝牙连接控制 (智能自适应版)</h3>
     <div class="row">
-        <input type="text" id="filterName" placeholder="筛选设备名(如LABMS-,为空不筛)">
+        <input type="text" id="filterName" placeholder="筛选设备名(如 LA / HC, 为空不筛)">
         <button id="connectBtn" class="success">🔍 搜索连接</button>
-        <button id="disconnectBtn" class="danger">断开当前连接</button>
+        <button id="disconnectBtn" class="danger">断开</button>
     </div>
-    <div class="row" style="font-size: 11px; color: #666;">
-        <div style="flex:1;">服务UUID (不确定请保持现状)：<input type="text" id="uuidService" value="0000ffe0-0000-1000-8000-00805f9b34fb" style="width:100%;"></div>
-        <div style="flex:1;">特征UUID (不确定请保持现状)：<input type="text" id="uuidChara" value="0000ffe1-0000-1000-8000-00805f9b34fb" style="width:100%;"></div>
-    </div>
+    
     <div class="row">
-        <label><input type="checkbox" id="autoConnectCheck"> 启用历史记忆重连</label>
-        <button id="reconnectBtn" style="display:none; padding:4px 8px; font-size:12px;">⚡ 一键重连</button>
+        <label><input type="checkbox" id="showCustomUUID" onchange="toggleUUIDPanel()"> ⚙️ 换了极冷门模块？勾选手动指定UUID</label>
+    </div>
+
+    <!-- 高级备用面板：默认隐藏，只有换了不在库里的模块才需要打开 -->
+    <div id="customUuidPanel" class="custom-uuid-panel">
+        <div style="font-size:11px; margin-bottom:4px;">服务主UUID (Service)：<input type="text" id="uuidService" value="" placeholder="自动识别中，无需填写" style="width:100%;"></div>
+        <div style="font-size:11px; margin-bottom:4px;">接收特征UUID (Notify)：<input type="text" id="uuidNotify" value="" placeholder="默认留空将自动寻道" style="width:100%;"></div>
+        <div style="font-size:11px;">发送特征UUID (Write)：<input type="text" id="uuidWrite" value="" placeholder="默认留空将自动寻道" style="width:100%;"></div>
     </div>
 </div>
 
-<!-- 2. 数据数据显示与状态灯 -->
 <div class="card">
     <h3>📊 数据监视器 & 状态指示</h3>
     <div class="grid-5">
@@ -122,7 +83,6 @@
     </div>
 </div>
 
-<!-- 3. 数据收发日志区 -->
 <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <h3 style="margin:0;">📝 通信日志</h3>
@@ -135,12 +95,11 @@
             <option value="\r\n">\r\n</option>
             <option value="\n">\n</option>
         </select>
-        <input type="text" id="txInput" placeholder="输入AT指令或JSON发送...">
+        <input type="text" id="txInput" placeholder="输入指令发送...">
         <button id="sendBtn">发送</button>
     </div>
 </div>
 
-<!-- 4. 快捷指令区 -->
 <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <h3 style="margin:0;">⚡ 快捷指令面板</h3>
@@ -150,13 +109,23 @@
 </div>
 
 <script>
+// 【万能自适应UUID武器库】—— 只要你的模块属于以下常见类型，网页会自动秒通，不需要填任何东西！
+const BUILTIN_SERVICES = [
+    "00002760-08c2-11e1-9073-0e8ac72e1001", // 1. 你的专属 LABMS 电池管理系统服务
+    "0000ffe0-0000-1000-8000-00805f9b34fb", // 2. 经典透传模块 (HC-05/06, JDY-31, CC2541)
+    "0000ff00-0000-1000-8000-00805f9b34fb", // 3. 常见汇承/正点原子模块
+    "6e400001-b5a3-f393-e0a9-e50e24dcca9e", // 4. Nordic UART 经典北欧半导体工业透传
+    "00004953-5343-fe5a-ee9b-861a243d124b", // 5. Microchip 常用数据通信服务
+    "0000af00-0000-1000-8000-00805f9b34fb"  // 6. 其他 BMS/仪器仪表常用通用段
+];
+
 let bleDevice = null;
-let bleCharacteristic = null;
+let writeChara = null;
+let notifyChara = null;
 let receiveBuffer = "";
 
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
-const reconnectBtn = document.getElementById('reconnectBtn');
 const statusBar = document.getElementById('statusBar');
 const logBox = document.getElementById('logBox');
 const txInput = document.getElementById('txInput');
@@ -177,105 +146,125 @@ function updateStatus(state, text) {
     statusBar.innerText = text;
 }
 
+function toggleUUIDPanel() {
+    const isChecked = document.getElementById('showCustomUUID').checked;
+    document.getElementById('customUuidPanel').style.display = isChecked ? 'block' : 'none';
+}
+
 window.onload = function() {
     if(localStorage.getItem('filterName')) document.getElementById('filterName').value = localStorage.getItem('filterName');
-    if(localStorage.getItem('uuidService')) document.getElementById('uuidService').value = localStorage.getItem('uuidService');
-    if(localStorage.getItem('uuidChara')) document.getElementById('uuidChara').value = localStorage.getItem('uuidChara');
     if(localStorage.getItem('parseRule')) document.getElementById('parseRule').value = localStorage.getItem('parseRule');
-    if(localStorage.getItem('autoConnect') === 'true') {
-        document.getElementById('autoConnectCheck').checked = true;
-        if(localStorage.getItem('lastDeviceId')) reconnectBtn.style.display = 'inline-block';
-    }
-    let savedCmds = JSON.parse(localStorage.getItem('shortcuts')) || [
-        {name: "查询版本", cmd: "AT+GMR"},
-        {name: "测试状态", cmd: "AT"}
-    ];
+    let savedCmds = JSON.parse(localStorage.getItem('shortcuts')) || [{name: "查询状态", cmd: "AT"}];
     savedCmds.forEach(item => createCmdRow(item.name, item.cmd));
 };
 
-function saveConfigs() {
-    localStorage.setItem('filterName', document.getElementById('filterName').value);
-    localStorage.setItem('uuidService', document.getElementById('uuidService').value);
-    localStorage.setItem('uuidChara', document.getElementById('uuidChara').value);
-    localStorage.setItem('autoConnect', document.getElementById('autoConnectCheck').checked);
-}
-
-connectBtn.addEventListener('click', () => doConnect(false));
-reconnectBtn.addEventListener('click', () => doConnect(true));
+connectBtn.addEventListener('click', doConnect);
 disconnectBtn.addEventListener('click', disconnectDevice);
 sendBtn.addEventListener('click', () => sendData(txInput.value));
 
-async function doConnect(isReconnect = false) {
-    saveConfigs();
-    let serviceUUID = document.getElementById('uuidService').value.trim().toLowerCase();
-    let charaUUID = document.getElementById('uuidChara').value.trim().toLowerCase();
+async function doConnect() {
+    localStorage.setItem('filterName', document.getElementById('filterName').value.trim());
     const nameFilter = document.getElementById('filterName').value.trim();
+    const isManualMode = document.getElementById('showCustomUUID').checked;
 
     updateStatus('connecting', '🟡 正在唤起蓝牙搜索中...');
-    log("唤起系统蓝牙搜索弹窗中...", "sys");
+    log("正在向浏览器申请蓝牙访问权限...", "sys");
+
+    // 确定本次连接允许侦测的服务群
+    let allowedServices = [...BUILTIN_SERVICES];
+    if (isManualMode && document.getElementById('uuidService').value.trim()) {
+        allowedServices.unshift(document.getElementById('uuidService').value.trim().toLowerCase());
+    }
 
     try {
-        let options = { acceptAllDevices: true };
-        if (nameFilter) {
-            options = { filters: [{ namePrefix: nameFilter }], optionalServices: [serviceUUID] };
-        } else {
-            // 如果不限制名字，则允许后续捕获所有隐藏的服务
-            options = { acceptAllDevices: true, optionalServices: [serviceUUID] };
-        }
+        let options = { optionalServices: allowedServices };
+        if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
+        else { options.acceptAllDevices = true; }
         
-        if (isReconnect && navigator.bluetooth.getDevices) {
-            const devices = await navigator.bluetooth.getDevices();
-            bleDevice = devices.find(d => d.id === localStorage.getItem('lastDeviceId'));
-        } else {
-            bleDevice = await navigator.bluetooth.requestDevice(options);
-        }
+        bleDevice = await navigator.bluetooth.requestDevice(options);
 
-        updateStatus('connecting', `🟡 正在连接: ${bleDevice.name || '未知设备'}...`);
-        log(`正在连接到设备: ${bleDevice.name || '未命名'}...`, "sys");
+        updateStatus('connecting', `🟡 正在连接: ${bleDevice.name || '蓝牙设备'}...`);
+        log(`成功握手设备: ${bleDevice.name || '未命名'}，建立GATT底层连接...`, "sys");
         
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         const server = await bleDevice.gatt.connect();
         
-        log("GATT 服务器已连通！正在搜寻服务...", "sys");
+        log("GATT 通道已建立。开始自动检索设备的服务树...", "sys");
         
-        let service;
-        try {
-            service = await server.getPrimaryService(serviceUUID);
-        } catch (servErr) {
-            log(`❌ 指定的 Service UUID [${serviceUUID}] 在该设备上找不到！`, "err");
-            log("正在尝试进行【全设备服务扫描】以找回正确的 UUID...", "sys");
-            
-            // 尝试扫描设备上的主要服务(部分浏览器受限，但能跑出异常提示)
-            const services = await server.getPrimaryServices();
-            log(`探测到该设备拥有以下服务列表：`, "sys");
-            services.forEach(s => log(`👉 服务UUID: ${s.uuid}`, "sys"));
-            log(`请从上方列表中复制正确的服务UUID到配置框，并重新连接！`, "err");
-            throw new Error("UUID不匹配");
+        // 核心智能识别：轮询我们允许的所有服务，看设备到底装了哪一个
+        let activeService = null;
+        for (let serviceUUID of allowedServices) {
+            try {
+                activeService = await server.getPrimaryService(serviceUUID);
+                log(`🎯 智能识别成功！捕获匹配的服务 UUID: [${serviceUUID}]`, "sys");
+                break;
+            } catch (e) {
+                // 如果不匹配，继续找下一个
+            }
         }
+
+        if (!activeService) {
+            throw new Error("该设备的UUID不在万能武器库中。请勾选‘手动指定UUID’进行填报。");
+        }
+
+        // 核心自适应特征绑定：全扫描该服务下的所有通道，自动分配读写
+        log("正在全量扫描通道特征属性...", "sys");
+        const characteristics = await activeService.getCharacteristics();
         
-        log("服务匹配成功！正在获取读写特征值...", "sys");
-        bleCharacteristic = await service.getCharacteristic(charaUUID);
-        
-        await bleCharacteristic.startNotifications();
-        bleCharacteristic.addEventListener('characteristicvaluechanged', handleDataReceived);
-        
+        let manualNotifyUUID = document.getElementById('uuidNotify').value.trim().toLowerCase();
+        let manualWriteUUID = document.getElementById('uuidWrite').value.trim().toLowerCase();
+
+        for (let chara of characteristics) {
+            let props = chara.properties;
+            
+            // 如果用户手动指定了，优先听用户的
+            if (isManualMode && manualNotifyUUID && chara.uuid === manualNotifyUUID) {
+                notifyChara = chara;
+            } else if (isManualMode && manualWriteUUID && chara.uuid === manualWriteUUID) {
+                writeChara = chara;
+            } else {
+                // 否则全自动智能分配
+                if ((props.notify || props.indicate) && !notifyChara) {
+                    notifyChara = chara;
+                    log(`📥 自动绑定 [数据接收通道]: ${chara.uuid}`, "sys");
+                }
+                if ((props.writeWithoutResponse || props.write) && !writeChara) {
+                    writeChara = chara;
+                    log(`📤 自动绑定 [数据发送通道]: ${chara.uuid}`, "sys");
+                }
+            }
+        }
+
+        // 启动接收通知
+        if (notifyChara) {
+            await notifyChara.startNotifications();
+            notifyChara.addEventListener('characteristicvaluechanged', handleDataReceived);
+        } else {
+            log("⚠️ 警告：该设备未发现可通知的接收通道，将处于‘单向发送’状态。", "sys");
+        }
+
+        if (!writeChara) log("⚠️ 警告：该设备没有写权限通道，将无法发送指令。", "sys");
+
         updateStatus('connected', `🟢 已连接: ${bleDevice.name || '蓝牙设备'}`);
-        log("🎉 蓝牙通信链路成功建立！可以开始发送指令。", "sys");
-        localStorage.setItem('lastDeviceId', bleDevice.id);
+        log("🎉 智能自适应连接完全成功！现在可以开始收发数据了。", "sys");
 
     } catch (error) {
-        updateStatus('disconnected', `🔴 连接断开/失败`);
-        log(`连接失败原因: ${error.message}`, "err");
+        updateStatus('disconnected', `🔴 连接失败`);
+        log(`失败原因: ${error.message}`, "err");
     }
 }
 
 async function sendData(dataStr) {
-    if (!bleCharacteristic) { log("错误：未建立连接，无法发送！", "err"); return; }
+    if (!writeChara) { log("错误：发送通道不可用，请先检查连接！", "err"); return; }
     dataStr += document.getElementById('lineEnd').value;
     try {
         const view = new TextEncoder().encode(dataStr);
-        await bleCharacteristic.writeValue(view);
-        log(`TX -> ${dataStr.replace(/\r/g,'\\r').replace(/\n/g,'\\n')}`, 'tx');
+        if (writeChara.properties.writeWithoutResponse) {
+            await writeChara.writeValueWithoutResponse(view);
+        } else {
+            await writeChara.writeValueWithResponse(view);
+        }
+        log(`TX -> ${dataStr}`, 'tx');
     } catch (error) { log(`发送失败: ${error.message}`, 'err'); }
 }
 
@@ -313,7 +302,7 @@ function executeParseRule(fullBuffer, incomingStr) {
 
 document.getElementById('saveRuleBtn').addEventListener('click', () => {
     localStorage.setItem('parseRule', document.getElementById('parseRule').value);
-    alert('规则保存！');
+    alert('解析规则保存成功！');
 });
 
 function disconnectDevice() {
@@ -323,16 +312,13 @@ function disconnectDevice() {
 
 function onDisconnected() {
     updateStatus('disconnected', '🔴 状态：未连接蓝牙设备');
-    log("提示：蓝牙连接已安全断开/复位。", "sys");
-    bleCharacteristic = null;
-    if(localStorage.getItem('autoConnect')==='true' && localStorage.getItem('lastDeviceId')) {
-        reconnectBtn.style.display = 'inline-block';
-    }
+    log("提示：连接已断开，通信流已复位。", "sys");
+    writeChara = null; notifyChara = null;
 }
 
 const cmdContainer = document.getElementById('cmdContainer');
 document.getElementById('addCmdBtn').addEventListener('click', () => {
-    let name = prompt("按钮名称:", "新指令");
+    let name = prompt("按钮名称:", "发送指令");
     let cmd = prompt("指令内容:", "");
     if(name && cmd) { createCmdRow(name, cmd); saveShortcuts(); }
 });
