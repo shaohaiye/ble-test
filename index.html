@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高级蓝牙智能控制中心 v5.0</title>
+    <title>高级蓝牙智能控制中心 v5.1</title>
     <style>
         :root {
             --primary: #007aff;
@@ -26,32 +26,28 @@
         button:active { opacity: 0.7; }
         button.danger { background: var(--danger); }
         button.success { background: var(--success); }
-        button.secondary { background: #8e8e93; }
+        button.warning { background: var(--warning); }
         
         .status-bar { padding: 10px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 14px; }
         .status-bar.disconnected { background: #ffe3e3; color: var(--danger); }
         .status-bar.connecting { background: #fff1cc; color: var(--warning); }
         .status-bar.connected { background: #e3f9e5; color: var(--success); }
         
-        /* 监控窗口样式 */
         .display-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 10px 6px; text-align: center; position: relative; }
         .display-title { font-size: 11px; color: #8e8e93; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; cursor: pointer; user-select: none; }
         .display-title::after { content: " ✏️"; font-size: 9px; opacity: 0.4; }
         .display-val { font-size: 20px; font-weight: bold; color: var(--primary); margin-top: 6px; min-height: 24px; word-break: break-all; }
         
-        /* 大状态灯样式 */
         .led-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 10px; padding: 8px 4px; text-align: center; }
         .led-title { font-size: 10px; color: #8e8e93; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
         .led { width: 24px; height: 24px; border-radius: 50%; background: #d1d1d6; margin: 0 auto; box-shadow: inset 0 2px 4px rgba(0,0,0,0.15); transition: all 0.3s; }
         .led.on { background: var(--success); box-shadow: 0 0 12px var(--success), inset 0 1px 2px rgba(255,255,255,0.6); }
         
-        /* 弹窗核心样式 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
         .modal-content { background: white; border-radius: 16px; padding: 16px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); animation: slideUp 0.2s ease-out; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .modal-header { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #333; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 底部日志折叠区 */
         .collapse-log { margin-top: 15px; }
         .collapse-header { background: #e5e5ea; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; font-size: 12px; }
         .collapse-body { display: none; background: #1c1c1e; color: #00ff66; font-family: monospace; height: 150px; overflow-y: auto; padding: 8px; border-radius: 0 0 8px 8px; font-size: 11px; line-height: 1.4; border-top: 1px solid #333; }
@@ -65,14 +61,14 @@
 </head>
 <body>
 
-<!-- 顶层状态 -->
 <div id="statusBar" class="status-bar disconnected">🔴 状态：未连接蓝牙设备</div>
 
-<!-- 主连接卡片 -->
+<!-- 主连接卡片 (增加了一键重连按钮) -->
 <div class="card">
     <div class="row">
         <input type="text" id="filterName" placeholder="筛选设备名(如 NBH,可空)">
         <button id="connectBtn" class="success">🔍 搜索连接</button>
+        <button id="reconnectBtn" class="warning">⚡ 一键重连上次设备</button>
         <button id="disconnectBtn" class="danger">断开</button>
     </div>
     <div class="row" style="margin-bottom: 0; margin-top: 4px;">
@@ -81,7 +77,7 @@
     </div>
 </div>
 
-<!-- 📊 数据监视窗口（分两排，每排3个） -->
+<!-- 📊 数据监视 -->
 <div class="card">
     <h3>📊 数据实时监视器 <span style="font-size: 10px; color:#999; font-weight:normal;">(双击别名可修改)</span></h3>
     <div class="grid-3">
@@ -96,7 +92,7 @@
     </div>
 </div>
 
-<!-- 🔴 大号状态指示灯（独立一排，6个） -->
+<!-- 🔴 大号状态指示灯 -->
 <div class="card">
     <h3>🚨 状态指示灯群 <span style="font-size: 10px; color:#999; font-weight:normal;">(双击别名可修改)</span></h3>
     <div class="grid-6">
@@ -123,7 +119,7 @@
     </div>
 </div>
 
-<!-- ⚡ 快捷指令面板（已挪动到发送输入框下方） -->
+<!-- ⚡ 快捷指令面板 -->
 <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <h3 style="margin:0; color: var(--text);">⚡ 快捷指令面板</h3>
@@ -173,6 +169,7 @@ let receiveBuffer = "";
 let isLogExpanded = false;
 
 const connectBtn = document.getElementById('connectBtn');
+const reconnectBtn = document.getElementById('reconnectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const statusBar = document.getElementById('statusBar');
 const logBox = document.getElementById('logBox');
@@ -217,12 +214,11 @@ window.onload = function() {
     if(localStorage.getItem('filterName')) document.getElementById('filterName').value = localStorage.getItem('filterName');
     if(localStorage.getItem('parseRule')) document.getElementById('parseRule').value = localStorage.getItem('parseRule');
     
-    // 恢复自定义UUID
+    // 智能去死缓存判断逻辑：本地如果没存过，就使用 HTML 默认的 FFF0 段
     if(localStorage.getItem('uuidService')) document.getElementById('uuidService').value = localStorage.getItem('uuidService');
     if(localStorage.getItem('uuidNotify')) document.getElementById('uuidNotify').value = localStorage.getItem('uuidNotify');
     if(localStorage.getItem('uuidWrite')) document.getElementById('uuidWrite').value = localStorage.getItem('uuidWrite');
 
-    // 还原所有自定义的窗口和灯的名字
     const aliases = ['t_v0','t_v1','t_v2','t_v3','t_v4','t_v5','t_l0','t_l1','t_l2','t_l3','t_l4','t_l5'];
     aliases.forEach(id => {
         if(localStorage.getItem('name_'+id)) document.getElementById(id).innerText = localStorage.getItem('name_'+id);
@@ -246,11 +242,12 @@ function saveScript() {
     alert('解析规则保存成功！');
 }
 
-connectBtn.addEventListener('click', doConnect);
+connectBtn.addEventListener('click', () => doConnect(false));
+reconnectBtn.addEventListener('click', () => doConnect(true)); // 一键重连触发
 disconnectBtn.addEventListener('click', disconnectDevice);
 sendBtn.addEventListener('click', () => sendData(txInput.value));
 
-async function doConnect() {
+async function doConnect(isReconnect = false) {
     localStorage.setItem('filterName', document.getElementById('filterName').value.trim());
     const nameFilter = document.getElementById('filterName').value.trim();
     
@@ -260,29 +257,45 @@ async function doConnect() {
 
     writeChara = null; 
     notifyChara = null;
-    updateStatus('connecting', '🟡 正在唤起蓝牙搜索中...');
+    updateStatus('connecting', '🟡 正在唤起蓝牙重连/搜索中...');
 
     try {
-        let options = { optionalServices: [serviceUUID] };
-        if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
-        else { options.acceptAllDevices = true; }
-        
-        bleDevice = await navigator.bluetooth.requestDevice(options);
-        updateStatus('connecting', `🟡 正在连接: ${bleDevice.name || '设备'}...`);
-        
+        if (isReconnect) {
+            // 【核心重连逻辑】：拉取该网页历史配对过的设备
+            if (!navigator.bluetooth.getDevices) {
+                throw new Error("当前浏览器或系统内核不支持历史设备检索，请使用 [搜索连接] 功能。");
+            }
+            log("正在检索历史配对记录...", "sys");
+            const devices = await navigator.bluetooth.getDevices();
+            
+            if (devices.length === 0) {
+                throw new Error("没有找到上一次配对的缓存设备，请先使用 [搜索连接] 配对一次。");
+            }
+            
+            // 默认捞取最后一次或历史第一个匹配到的有效设备
+            bleDevice = devices[0];
+            log(`Found cached: ${bleDevice.name || '未知设备'}，开始后台穿透握手...`, "sys");
+        } else {
+            // 正常搜索流程
+            let options = { optionalServices: [serviceUUID] };
+            if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
+            else { options.acceptAllDevices = true; }
+            bleDevice = await navigator.bluetooth.requestDevice(options);
+        }
+
+        updateStatus('connecting', `🟡 正在建立链路: ${bleDevice.name || '设备'}...`);
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         const server = await bleDevice.gatt.connect();
         
-        log(`🎯 正在获取指定的主服务 [${serviceUUID}]...`, "sys");
+        log(`🎯 正在绑定主服务 [${serviceUUID}]...`, "sys");
         const activeService = await server.getPrimaryService(serviceUUID);
         
-        log("开始精准检索目标特征通道...", "sys");
+        log("开始建立特征数据流通道...", "sys");
         const characteristics = await activeService.getCharacteristics();
         
         notifyChara = characteristics.find(c => c.uuid.toLowerCase().includes(notifyUUID));
         writeChara = characteristics.find(c => c.uuid.toLowerCase().includes(writeUUID));
 
-        // 智能弹性捕获机制
         for (let chara of characteristics) {
             if (!notifyChara && (chara.properties.notify || chara.properties.indicate)) notifyChara = chara;
             if (!writeChara && (chara.properties.writeWithoutResponse || chara.properties.write)) writeChara = chara;
@@ -291,11 +304,11 @@ async function doConnect() {
         if (notifyChara) {
             await notifyChara.startNotifications();
             notifyChara.addEventListener('characteristicvaluechanged', handleDataReceived);
-            log(`✅ 接收通道绑定成功: ${notifyChara.uuid}`, "sys");
+            log(`✅ 接收订阅成功`, "sys");
         }
         
         updateStatus('connected', `🟢 已连接: ${bleDevice.name || '蓝牙设备'}`);
-        log(`🎉 链路构建完成！发送通道锁定为: ${writeChara ? writeChara.uuid : '未就绪'}`, "sys");
+        log(`🎉 链路完全架设就绪！`, "sys");
 
     } catch (error) {
         updateStatus('disconnected', `🔴 连接失败`);
@@ -304,7 +317,7 @@ async function doConnect() {
 }
 
 async function sendData(dataStr) {
-    if (!writeChara) { log("错误：发送通道未就绪，无法发送指令！", "err"); return; }
+    if (!writeChara) { log("错误：发送通道未就绪！", "err"); return; }
     dataStr += document.getElementById('lineEnd').value;
     
     try {
@@ -314,7 +327,7 @@ async function sendData(dataStr) {
             log(`TX -> ${dataStr.replace(/\r/g,'\\r').replace(/\n/g,'\\n')}`, 'tx');
         } catch (err1) {
             await writeChara.writeValueWithResponse(view);
-            log(`TX -> ${dataStr.replace(/\r/g,'\\r').replace(/\n/g,'\\n')} (带回执)`, 'tx');
+            log(`TX -> ${dataStr.replace(/\r/g,'\\r').replace(/\n/g,'\\n')} (有响应)`, 'tx');
         }
     } catch (error) { 
         log(`发送失败: ${error.message}`, 'err'); 
@@ -337,7 +350,6 @@ function executeParseRule(fullBuffer, incomingStr) {
         if (s !== -1 && e > s) json = JSON.parse(text.substring(s, e + 1));
     } catch(e) {}
     
-    // 初始化6个数据和6个灯对应的本地变量
     let v0='-', v1='-', v2='-', v3='-', v4='-', v5='-';
     let l0=false, l1=false, l2=false, l3=false, l4=false, l5=false;
     try {
@@ -359,14 +371,23 @@ function executeParseRule(fullBuffer, incomingStr) {
 }
 
 function disconnectDevice() {
-    if (bleDevice && bleDevice.gatt.connected) { bleDevice.gatt.disconnect(); }
-    else { onDisconnected(); }
+    log("正在全力切断底层蓝牙链路...", "sys");
+    if (notifyChara) {
+        try { notifyChara.removeEventListener('characteristicvaluechanged', handleDataReceived); } catch(e){}
+        notifyChara = null;
+    }
+    writeChara = null;
+    if (bleDevice && bleDevice.gatt.connected) { 
+        bleDevice.gatt.disconnect(); 
+    } else { 
+        onDisconnected(); 
+    }
 }
 
 function onDisconnected() {
     updateStatus('disconnected', '🔴 状态：未连接蓝牙设备');
-    log("提示：通信断开，链路复位。", "sys");
-    writeChara = null; notifyChara = null;
+    log("提示：底层链路已安全断开，允许重新捕获。", "sys");
+    writeChara = null; notifyChara = null; bleDevice = null;
 }
 
 document.getElementById('addCmdBtn').addEventListener('click', () => {
