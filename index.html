@@ -261,7 +261,7 @@ async function doConnect(isReconnect = false) {
 
     try {
         if (isReconnect) {
-            // 【核心重连逻辑】：拉取该网页历史配对过的设备
+            // 【核心重连智能升级】：拉取该网页历史配对过的所有设备
             if (!navigator.bluetooth.getDevices) {
                 throw new Error("当前浏览器或系统内核不支持历史设备检索，请使用 [搜索连接] 功能。");
             }
@@ -269,12 +269,36 @@ async function doConnect(isReconnect = false) {
             const devices = await navigator.bluetooth.getDevices();
             
             if (devices.length === 0) {
-                throw new Error("没有找到上一次配对的缓存设备，请先使用 [搜索连接] 配对一次。");
+                throw new Error("没有找到任何上一次配对的缓存设备，请先使用 [搜索连接] 配对一次。");
             }
             
-            // 默认捞取最后一次或历史第一个匹配到的有效设备
-            bleDevice = devices[0];
-            log(`Found cached: ${bleDevice.name || '未知设备'}，开始后台穿透握手...`, "sys");
+            // 智能分流判定
+            if (devices.length === 1) {
+                // 只有一个设备时，别废话直接连
+                bleDevice = devices[0];
+                log(`发现唯一历史设备: ${bleDevice.name || '未知设备'}，开始连接...`, "sys");
+            } else {
+                // 有多个设备时，弹出提示框让用户自己选，再也不盲连了！
+                let msg = "检测到多个历史配对设备，请输入序号选择要连接哪一个：\n\n";
+                devices.forEach((dev, index) => {
+                    msg += `【${index + 1}】 ${dev.name || '未命名设备'} (ID: ${dev.id.substring(0,8)}...)\n`;
+                });
+                
+                let choice = prompt(msg, "1");
+                if (choice === null) { 
+                    updateStatus('disconnected', '🔴 用户取消了重连');
+                    log("重连操作已被你手动取消。", "sys");
+                    return; 
+                }
+                
+                let idx = parseInt(choice) - 1;
+                if (isNaN(idx) || idx < 0 || idx >= devices.length) {
+                    throw new Error("别闹，输入的序号不正确，重连终止。");
+                }
+                
+                bleDevice = devices[idx];
+                log(`已确认！你选择了设备 【${choice}】: ${bleDevice.name || '未知设备'}`, "sys");
+            }
         } else {
             // 正常搜索流程
             let options = { optionalServices: [serviceUUID] };
