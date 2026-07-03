@@ -3,130 +3,430 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web 蓝牙搜索测试</title>
+    <title>高级网页蓝牙调试助手</title>
     <style>
+        :root {
+            --primary: #007aff;
+            --success: #34c759;
+            --danger: #ff3b30;
+            --warning: #ff9500;
+            --bg: #f2f2f7;
+            --card: #ffffff;
+            --text: #1c1c1e;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 20px;
-            background-color: #f5f5f7;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h2 {
-            margin-top: 0;
-            color: #007aff;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #007aff;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:active {
-            background-color: #0056b3;
-        }
-        .log-box {
-            margin-top: 20px;
-            background: #272822;
-            color: #f8f8f2;
-            padding: 15px;
-            border-radius: 8px;
-            height: 250px;
-            overflow-y: auto;
-            font-family: monospace;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 10px;
             font-size: 14px;
-            line-height: 1.5;
         }
-        .error { color: #ff6b6b; }
-        .success { color: #a6e22e; }
-        .info { color: #66d9ef; }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        h3 { margin: 0 0 10px 0; font-size: 15px; color: #333; border-left: 4px solid var(--primary); padding-left: 6px; }
+        .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        input, select, button {
+            padding: 8px;
+            border: 1px solid #d1d1d6;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        input[type="text"] { flex: 1; min-width: 60px; }
+        button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:active { opacity: 0.8; }
+        button.danger { background: var(--danger); }
+        button.success { background: var(--success); }
+        
+        /* 状态灯与窗口 */
+        .display-box { background: #f8f9fa; border: 1px solid #e5e5ea; border-radius: 8px; padding: 6px; text-align: center; }
+        .display-title { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .display-val { font-size: 16px; font-weight: bold; color: var(--primary); margin: 4px 0; min-height: 20px; }
+        .led { width: 12px; height: 12px; border-radius: 50%; background: #aeaeae; margin: 0 auto; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+        .led.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+        /* 日志区 */
+        .log-area {
+            background: #1c1c1e; color: #00ff66; font-family: monospace; 
+            height: 150px; overflow-y: auto; padding: 8px; border-radius: 8px; 
+            font-size: 12px; line-height: 1.4; margin-bottom: 6px;
+        }
+        .log-tx { color: #5eaeff; }
+        .log-err { color: var(--danger); }
+        .log-sys { color: var(--warning); }
+
+        /* 快捷指令 */
+        .cmd-item { display: flex; gap: 6px; margin-bottom: 6px; width: 100%; }
+        .cmd-btn { min-width: 70px; background: #e5e5ea; color: var(--text); font-weight: normal; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+        
+        label { display: flex; align-items: center; gap: 4px; font-size: 13px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Web Bluetooth 搜索测试</h2>
-    <p style="font-size: 14px; color: #666;">提示：请确保在 HTTPS 环境下打开，并使用支持 Web BLE 的浏览器（如 iOS 上的 Bluefy）。</p>
-    
-    <!-- 触发蓝牙搜索的按钮 -->
-    <button id="scanBtn">开始搜索蓝牙设备</button>
+<!-- 1. 连接与配置区 -->
+<div class="card">
+    <h3>📡 蓝牙连接控制</h3>
+    <div class="row">
+        <input type="text" id="filterName" placeholder="筛选设备名(如HC-,为空不筛)">
+        <button id="connectBtn" class="success">🔍 搜索连接</button>
+        <button id="disconnectBtn" class="danger" style="display:none;">断开</button>
+    </div>
+    <div class="row" style="font-size: 12px; color: #55px;">
+        <input type="text" id="uuidService" placeholder="服务UUID (默认FFE0)" value="0000ffe0-0000-1000-8000-00805f9b34fb">
+        <input type="text" id="uuidChara" placeholder="特征UUID (默认FFE1)" value="0000ffe1-0000-1000-8000-00805f9b34fb">
+    </div>
+    <div class="row">
+        <label><input type="checkbox" id="autoConnectCheck"> 启用历史记忆重连</label>
+        <button id="reconnectBtn" style="display:none; padding:4px 8px; font-size:12px;">⚡ 一键重连上次设备</button>
+    </div>
+</div>
 
-    <!-- 用于显示调试日志的区域 -->
-    <div class="log-box" id="logBox">
-        <span class="info">[系统] 等待点击按钮开始搜索...</span><br>
+<!-- 2. 数据数据显示与状态灯 -->
+<div class="card">
+    <h3>📊 数据监视器 & 状态指示</h3>
+    <div class="grid-5">
+        <!-- 5个数值窗口与指示灯组合 -->
+        <div class="display-box">
+            <div class="display-title" id="t0">数据 1</div>
+            <div class="display-val" id="v0">-</div>
+            <div class="led" id="l0"></div>
+        </div>
+        <div class="display-box">
+            <div class="display-title" id="t1">数据 2</div>
+            <div class="display-val" id="v1">-</div>
+            <div class="led" id="l1"></div>
+        </div>
+        <div class="display-box">
+            <div class="display-title" id="t2">数据 3</div>
+            <div class="display-val" id="v2">-</div>
+            <div class="led" id="l2"></div>
+        </div>
+        <div class="display-box">
+            <div class="display-title" id="t3">数据 4</div>
+            <div class="display-val" id="v3">-</div>
+            <div class="led" id="l3"></div>
+        </div>
+        <div class="display-box">
+            <div class="display-title" id="t4">数据 5</div>
+            <div class="display-val" id="v4">-</div>
+            <div class="led" id="l4"></div>
+        </div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+        <input type="text" id="parseRule" placeholder="JS解析脚本(例: v0=json.temp; l0=json.switch==1;)" style="font-family: monospace; font-size:12px;">
+        <button id="saveRuleBtn" style="padding:6px;">💾 保存规则</button>
+    </div>
+    <div style="font-size:11px; color:#8e8e93; margin-top:2px;">
+        注：支持纯文本或JSON。脚本可用变量：`text`(字符串)、`json`(对象)、`v0-v4`(数值窗口)、`l0-l4`(灯true/false)。
+    </div>
+</div>
+
+<!-- 3. 数据收发日志区 -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h3 style="margin:0;">📝 通信日志</h3>
+        <button onclick="document.getElementById('logBox').innerHTML=''" style="padding:2px 8px; font-size:11px; background:#8e8e93;">清空</button>
+    </div>
+    <div class="log-area" id="logBox"></div>
+    <div class="row">
+        <select id="lineEnd">
+            <option value="">无结束符</option>
+            <option value="\r\n">换行符 (\r\n)</option>
+            <option value="\n">换行符 (\n)</option>
+        </select>
+        <input type="text" id="txInput" placeholder="输入AT指令或JSON发送...">
+        <button id="sendBtn">发送</button>
+    </div>
+</div>
+
+<!-- 4. 快捷指令区 -->
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h3 style="margin:0;">⚡ 快捷指令面板</h3>
+        <button id="addCmdBtn" style="padding:2px 8px; font-size:11px;">➕ 添加指令</button>
+    </div>
+    <div id="cmdContainer">
+        <!-- 动态生成快捷指令 -->
     </div>
 </div>
 
 <script>
-    const scanBtn = document.getElementById('scanBtn');
-    const logBox = document.getElementById('logBox');
+// --- 全局核心变量 ---
+let bleDevice = null;
+let bleCharacteristic = null;
+let receiveBuffer = "";
 
-    // 封装一个打印日志的函数
-    function log(message, type = 'info') {
-        const time = new Date().toLocaleTimeString();
-        const span = document.createElement('span');
-        span.className = type;
-        span.innerHTML = `[${time}] ${message}<br>`;
-        logBox.appendChild(span);
-        logBox.scrollTop = logBox.scrollHeight; // 滚动条自动滚到底部
+// --- 页面元素获取 ---
+const connectBtn = document.getElementById('connectBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
+const reconnectBtn = document.getElementById('reconnectBtn');
+const logBox = document.getElementById('logBox');
+const txInput = document.getElementById('txInput');
+const sendBtn = document.getElementById('sendBtn');
+
+// --- 打印日志封装 ---
+function log(msg, type='rx') {
+    const time = new Date().toLocaleTimeString();
+    let cls = '';
+    if(type==='tx') cls='log-tx';
+    if(type==='err') cls='log-err';
+    if(type==='sys') cls='log-sys';
+    logBox.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+// --- 本地存储数据加载与初始化 ---
+window.onload = function() {
+    // 恢复历史输入项
+    if(localStorage.getItem('filterName')) document.getElementById('filterName').value = localStorage.getItem('filterName');
+    if(localStorage.getItem('uuidService')) document.getElementById('uuidService').value = localStorage.getItem('uuidService');
+    if(localStorage.getItem('uuidChara')) document.getElementById('uuidChara').value = localStorage.getItem('uuidChara');
+    if(localStorage.getItem('parseRule')) document.getElementById('parseRule').value = localStorage.getItem('parseRule');
+    if(localStorage.getItem('autoConnect') === 'true') {
+        document.getElementById('autoConnectCheck').checked = true;
+        if(localStorage.getItem('lastDeviceId')) reconnectBtn.style.display = 'inline-block';
     }
 
-    // 按钮点击事件
-    scanBtn.addEventListener('click', async () => {
-        log('正在检查浏览器蓝牙支持情况...', 'info');
+    // 初始化快捷指令
+    let savedCmds = JSON.parse(localStorage.getItem('shortcuts')) || [
+        {name: "查询版本", cmd: "AT+GMR"},
+        {name: "测试状态", cmd: "AT"},
+        {name: "开关JSON", cmd: '{"switch":1,"temp":25.4}'}
+    ];
+    savedCmds.forEach(item => createCmdRow(item.name, item.cmd));
+};
 
-        // 1. 检查浏览器是否支持蓝牙 API
-        if (!navigator.bluetooth) {
-            log('错误：当前浏览器或环境不支持 Web Bluetooth API！请检查是否使用了 HTTPS，或者是否更换了支持的浏览器（如 Bluefy）。', 'error');
-            return;
-        }
+// 保存配置防丢失
+function saveConfigs() {
+    localStorage.setItem('filterName', document.getElementById('filterName').value);
+    localStorage.setItem('uuidService', document.getElementById('uuidService').value);
+    localStorage.setItem('uuidChara', document.getElementById('uuidChara').value);
+    localStorage.setItem('autoConnect', document.getElementById('autoConnectCheck').checked);
+}
 
-        log('正在调起系统蓝牙搜索框...', 'info');
+// --- 核心蓝牙逻辑 ---
+connectBtn.addEventListener('click', () => doConnect(false));
+reconnectBtn.addEventListener('click', () => doConnect(true));
+disconnectBtn.addEventListener('click', disconnectDevice);
+sendBtn.addEventListener('click', () => sendData(txInput.value));
 
-        try {
-            // 2. 发起蓝牙设备请求
-            // acceptAllDevices: true 表示搜索附近所有蓝牙设备
-            // optionalServices: 如果你后续要连接获取数据，需要在这里填写设备支持的 Service UUID（比如 ['battery_service']）
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true
-                // 如果只想搜特定名字的设备，可以换成下面这种写法：
-                // filters: [{ namePrefix: 'MyDevice' }] 
-            });
+async function doConnect(isReconnect = false) {
+    saveConfigs();
+    const nameFilter = document.getElementById('filterName').value.trim();
+    const serviceUUID = document.getElementById('uuidService').value.trim().toLowerCase();
+    const charaUUID = document.getElementById('uuidChara').value.trim().toLowerCase();
 
-            // 3. 用户在系统弹窗中选择设备并配对成功
-            log(`成功选择设备！`, 'success');
-            log(`设备名称 (Name): ${device.name || '未知名称'}`, 'success');
-            log(`设备ID (ID): ${device.id}`, 'success');
-            
-            // 这里可以继续监听设备断开事件
-            device.addEventListener('gattserverdisconnected', () => {
-                log('提示：蓝牙设备已断开连接。', 'error');
-            });
+    if (!navigator.bluetooth) {
+        log("错误：当前环境不支持 Web Bluetooth！请检查 HTTPS 或是否更换了 Bluefy 浏览器。", "err");
+        return;
+    }
 
-        } catch (error) {
-            // 4. 捕获用户取消或搜索失败的错误
-            if (error.name === 'NotFoundError') {
-                log('用户取消了蓝牙搜索，或未选择任何设备。', 'error');
-            } else {
-                log(`搜索失败: ${error.message}`, 'error');
-                console.error(error);
+    try {
+        let options = { optionalServices: [serviceUUID] };
+        
+        if (isReconnect) {
+            log("正在尝试唤醒记忆中的历史设备...", "sys");
+            // 规范限制：即使getDevices拿到了，仍需手势触发，且必须支持getDevices
+            if (navigator.bluetooth.getDevices) {
+                const devices = await navigator.bluetooth.getDevices();
+                const lastId = localStorage.getItem('lastDeviceId');
+                bleDevice = devices.find(d => d.id === lastId);
             }
+            if (!bleDevice) {
+                log("重连失败：找不到该设备的历史配对记录，请点‘搜索连接’重新配对。", "err");
+                return;
+            }
+        } else {
+            if (nameFilter) {
+                options.filters = [{ namePrefix: nameFilter }];
+            } else {
+                options.acceptAllDevices = true;
+            }
+            log("唤起系统蓝牙搜索弹窗中...", "sys");
+            bleDevice = await navigator.bluetooth.requestDevice(options);
         }
-    });
-</script>
 
+        log(`正在连接到设备: ${bleDevice.name || '未命名设备'}...`, "sys");
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        
+        const server = await bleDevice.gatt.connect();
+        log("GATT 服务器连通，正在获取服务...", "sys");
+        
+        const service = await server.getPrimaryService(serviceUUID);
+        log("核心服务就绪，正在获取读写特征值...", "sys");
+        
+        bleCharacteristic = await service.getCharacteristic(charaUUID);
+        
+        // 开启数据接收监听
+        await bleCharacteristic.startNotifications();
+        bleCharacteristic.addEventListener('characteristicvaluechanged', handleDataReceived);
+        
+        log("🎉 蓝牙通信链路建立成功！可以开始收发数据了。", "sys");
+        
+        // 记忆设备ID
+        localStorage.setItem('lastDeviceId', bleDevice.id);
+        
+        // 改变按钮状态
+        connectBtn.style.display = 'none';
+        reconnectBtn.style.display = 'none';
+        disconnectBtn.style.display = 'inline-block';
+
+    } catch (error) {
+        log(`连接失败: ${error.message}`, "err");
+        console.error(error);
+    }
+}
+
+// --- 数据发送逻辑 ---
+async function sendData(dataStr) {
+    if (!bleCharacteristic) {
+        alert("请先连接蓝牙设备！");
+        return;
+    }
+    if (!dataStr) return;
+
+    // 附带行尾结束符
+    dataStr += document.getElementById('lineEnd').value;
+    
+    try {
+        const encoder = new TextEncoder();
+        const view = encoder.encode(dataStr);
+        await bleCharacteristic.writeValue(view);
+        log(`TX -> ${dataStr.replace(/\r/g,'\\r').replace(/\n/g,'\\n')}`, 'tx');
+    } catch (error) {
+        log(`发送失败: ${error.message}`, 'err');
+    }
+}
+
+// --- 数据接收与自定义规则动态解析核心 ---
+function handleDataReceived(event) {
+    const decoder = new TextDecoder();
+    const rawStr = decoder.decode(event.target.value);
+    receiveBuffer += rawStr;
+
+    // 按行或全量处理，此处采用实时流分析处理
+    log(`RX <- ${rawStr}`);
+
+    // 执行数据解析
+    executeParseRule(receiveBuffer, rawStr);
+}
+
+function executeParseRule(fullBuffer, incomingStr) {
+    const rule = document.getElementById('parseRule').value.trim();
+    if (!rule) return;
+
+    let text = fullBuffer;
+    let json = {};
+    try {
+        // 尝试抽离提取出最新的一个完整JSON串
+        let startIdx = text.lastIndexOf('{');
+        let endIdx = text.lastIndexOf('}');
+        if (startIdx !== -1 && endIdx > startIdx) {
+            let jsonStr = text.substring(startIdx, endIdx + 1);
+            json = JSON.parse(jsonStr);
+        }
+    } catch(e) { /* 不是合法JSON或不完整，暂不解析 */ }
+
+    // 初始化沙盒操作环境环境变量
+    let v0='-', v1='-', v2='-', v3='-', v4='-';
+    let l0=false, l1=false, l2=false, l3=false, l4=false;
+
+    try {
+        // 利用动态执行脚本
+        // 警告：纯前端本地调试，eval可安全解析自写逻辑
+        eval(rule);
+
+        // 将解析后的结果映射输出到UI窗口中
+        if(v0!=='-') { document.getElementById('v0').innerText = v0; updateTitleAndStyle(0, rule, 'v'); }
+        if(v1!=='-') { document.getElementById('v1').innerText = v1; updateTitleAndStyle(1, rule, 'v'); }
+        if(v2!=='-') { document.getElementById('v2').innerText = v2; updateTitleAndStyle(2, rule, 'v'); }
+        if(v3!=='-') { document.getElementById('v3').innerText = v3; updateTitleAndStyle(3, rule, 'v'); }
+        if(v4!=='-') { document.getElementById('v4').innerText = v4; updateTitleAndStyle(4, rule, 'v'); }
+
+        document.getElementById('l0').className = l0 ? 'led on' : 'led';
+        document.getElementById('l1').className = l1 ? 'led on' : 'led';
+        document.getElementById('l2').className = l2 ? 'led on' : 'led';
+        document.getElementById('l3').className = l3 ? 'led on' : 'led';
+        document.getElementById('l4').className = l4 ? 'led on' : 'led';
+    } catch(err) {
+        // 脚本执行错误不强行阻断
+        console.error("解析规则执行报错:", err);
+    }
+}
+
+// 保存解析脚本按钮动作
+document.getElementById('saveRuleBtn').addEventListener('click', () => {
+    localStorage.setItem('parseRule', document.getElementById('parseRule').value);
+    alert('解析规则保存成功！');
+});
+
+// --- 断开连接处理 ---
+function disconnectDevice() {
+    if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+    }
+}
+function onDisconnected() {
+    log("提示：蓝牙连接已安全断开。", "sys");
+    bleCharacteristic = null;
+    connectBtn.style.display = 'inline-block';
+    if(localStorage.getItem('autoConnect')==='true' && localStorage.getItem('lastDeviceId')) {
+        reconnectBtn.style.display = 'inline-block';
+    }
+    disconnectBtn.style.display = 'none';
+}
+
+// --- 快捷指令动态增删逻辑 ---
+const cmdContainer = document.getElementById('cmdContainer');
+document.getElementById('addCmdBtn').addEventListener('click', () => {
+    let name = prompt("请输入快捷按钮名称 (如：打开LED):", "新指令");
+    let cmd = prompt("请输入要发送的指令文本 (支持AT或JSON):", "");
+    if(name && cmd) {
+        createCmdRow(name, cmd);
+        saveShortcuts();
+    }
+});
+
+function createCmdRow(name, cmd) {
+    const div = document.createElement('div');
+    div.className = 'cmd-item';
+    div.innerHTML = `
+        <button class="cmd-btn" title="${cmd}">${name}</button>
+        <input type="text" value="${cmd}" class="cmd-value" style="font-family:monospace; font-size:12px;">
+        <button class="danger" style="padding:4px 8px; font-size:11px;" onclick="this.parentElement.remove();saveShortcuts();">✕</button>
+    `;
+    // 点击按钮发送对应输入框内的值
+    div.querySelector('.cmd-btn').addEventListener('click', () => {
+        sendData(div.querySelector('.cmd-value').value);
+    });
+    // 监听输入框变化实时保存
+    div.querySelector('.cmd-value').addEventListener('change', saveShortcuts);
+    cmdContainer.appendChild(div);
+}
+
+function saveShortcuts() {
+    let items = [];
+    document.querySelectorAll('.cmd-item').forEach(el => {
+        items.push({
+            name: el.querySelector('.cmd-btn').innerText,
+            cmd: el.querySelector('.cmd-value').value
+        });
+    });
+    localStorage.setItem('shortcuts', JSON.stringify(items));
+}
+
+function updateTitleAndStyle(index, rule, type) {
+    // 辅助提取变量名来动态给窗口改名，提升易用性
+}
+</script>
 </body>
 </html>
