@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>高级蓝牙智能控制中心 v5.2</title>
+    <title>高级蓝牙智能控制中心 v5.3</title>
     <style>
         :root {
             --primary: #007aff;
@@ -14,7 +14,6 @@
             --card: #ffffff;
             --text: #1c1c1e;
         }
-        /* 核心：通过 touch-action 禁用手机双击缩放，防止干扰事件 */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             background-color: var(--bg); 
@@ -24,7 +23,7 @@
             font-size: 14px; 
             box-sizing: border-box;
             touch-action: manipulation; 
-            -webkit-user-select: none; /* 优化手机长按体验，防止弹出系统选择文字框 */
+            -webkit-user-select: none;
             user-select: none;
         }
         .card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -80,7 +79,7 @@
     <div class="row">
         <input type="text" id="filterName" placeholder="筛选设备名(如 NBH,可空)">
         <button id="connectBtn" class="success">🔍 搜索连接</button>
-        <button id="reconnectBtn" class="warning">⚡ 一键重连</button>
+        <button id="reconnectBtn" class="warning">⚡ 极速重连</button>
         <button id="disconnectBtn" class="danger">断开</button>
     </div>
     <div class="row" style="margin-bottom: 0; margin-top: 4px;">
@@ -89,9 +88,9 @@
     </div>
 </div>
 
-<!-- 📊 数据监视 （修改为手机端支持长按或点击改名） -->
+<!-- 📊 数据监视 -->
 <div class="card">
-    <h3>📊 数据实时监视器 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上长按或点击标题改名)</span></h3>
+    <h3>📊 数据实时监视器 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上点击或长按标题改名)</span></h3>
     <div class="grid-3">
         <div class="display-box"><div class="display-title touch-rename" id="t_v0">数据 1</div><div class="display-val" id="v0">-</div></div>
         <div class="display-box"><div class="display-title touch-rename" id="t_v1">数据 2</div><div class="display-val" id="v1">-</div></div>
@@ -106,7 +105,7 @@
 
 <!-- 🔴 大号状态指示灯 -->
 <div class="card">
-    <h3>🚨 状态指示灯群 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上长按或点击标题改名)</span></h3>
+    <h3>🚨 状态指示灯群 <span style="font-size: 10px; color:#999; font-weight:normal;">(手机上点击或长按标题改名)</span></h3>
     <div class="grid-6">
         <div class="led-box"><div class="led-title touch-rename" id="t_l0">开关1</div><div class="led" id="l0"></div></div>
         <div class="led-box"><div class="led-title touch-rename" id="t_l1">开关2</div><div class="led" id="l1"></div></div>
@@ -213,7 +212,6 @@ function toggleLogArea() {
     document.getElementById('arrowIndicator').innerText = isLogExpanded ? '收起 ∨' : '展开 ＞';
 }
 
-// 统一手机和电脑的重命名触发函数
 function renameItem(id) {
     let oldName = document.getElementById(id).innerText.replace(" ✏️","").replace("✏️","").trim();
     let newName = prompt("请输入新的显示别名:", oldName);
@@ -239,12 +237,9 @@ window.onload = function() {
     let savedCmds = JSON.parse(localStorage.getItem('shortcuts')) || [{name: "查询状态", cmd: "AT"}];
     savedCmds.forEach(item => createCmdRow(item.name, item.cmd));
 
-    // 绑定手机端点击和长按改名事件（解决双击导致缩放放大的Bug）
     document.querySelectorAll('.touch-rename').forEach(el => {
         let timer = null;
-        // 1. 支持直接点击改名
         el.addEventListener('click', () => { renameItem(el.id); });
-        // 2. 同时也支持长按改名
         el.addEventListener('touchstart', () => {
             timer = setTimeout(() => { renameItem(el.id); }, 600);
         });
@@ -267,11 +262,19 @@ function saveScript() {
 }
 
 connectBtn.addEventListener('click', () => doConnect(false));
-reconnectBtn.addEventListener('click', () => doConnect(true));
+reconnectBtn.addEventListener('click', () => doConnect(true)); // 触发重连
 disconnectBtn.addEventListener('click', disconnectDevice);
 sendBtn.addEventListener('click', () => sendData(txInput.value));
 
 async function doConnect(isReconnect = false) {
+    // 【核心修复：重连前全力清洗底层链路，防止 iOS 占用死锁】
+    if (bleDevice) {
+        log("清理上一次残留的硬件句柄...", "sys");
+        try { if(bleDevice.gatt.connected) bleDevice.gatt.disconnect(); } catch(e){}
+        bleDevice = null;
+    }
+    writeChara = null; notifyChara = null;
+
     localStorage.setItem('filterName', document.getElementById('filterName').value.trim());
     const nameFilter = document.getElementById('filterName').value.trim();
     
@@ -279,47 +282,32 @@ async function doConnect(isReconnect = false) {
     const notifyUUID = document.getElementById('uuidNotify').value.trim().toLowerCase();
     const writeUUID = document.getElementById('uuidWrite').value.trim().toLowerCase();
 
-    writeChara = null; 
-    notifyChara = null;
-    updateStatus('connecting', '🟡 正在唤起蓝牙链路中...');
+    updateStatus('connecting', '🟡 正在拉起系统蓝牙安全面板...');
 
     try {
-        if (isReconnect) {
-            log("正在尝试检索浏览器配对历史...", "sys");
-            let devices = [];
-            // 规避部分 iOS 浏览器缺失 API 的报错
-            if (navigator.bluetooth && navigator.bluetooth.getDevices) {
-                devices = await navigator.bluetooth.getDevices();
-            }
-            
-            // 【核心重连优化：智能降级兜底】
-            if (devices && devices.length > 0) {
-                bleDevice = devices[0]; 
-                log(`在缓存中发现历史设备: ${bleDevice.name || '未知设备'}，正在直接握手...`, "sys");
-            } else {
-                // 如果浏览器说历史记录为空或者没弹窗权限，绝不报错卡死，直接原地转为“正常弹窗搜索”
-                log("⚠️ 缓存列表为空或当前环境受限，已自动为您唤起标准搜索窗口...", "sys");
-                let options = { optionalServices: [serviceUUID] };
-                if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
-                else { options.acceptAllDevices = true; }
-                bleDevice = await navigator.bluetooth.requestDevice(options);
-            }
+        let options = { optionalServices: [serviceUUID] };
+        
+        // 【极速重连底层精髓】：如果是点击重连，自动锁定当前已有筛选，100%强制唤出安全弹窗
+        if (isReconnect && nameFilter) {
+            log(`极速重连锁定前缀: [${nameFilter}]`, "sys");
+            options.filters = [{ namePrefix: nameFilter }];
+        } else if (nameFilter) {
+            options.filters = [{ namePrefix: nameFilter }];
         } else {
-            // 正常搜索流程
-            let options = { optionalServices: [serviceUUID] };
-            if (nameFilter) { options.filters = [{ namePrefix: nameFilter }]; }
-            else { options.acceptAllDevices = true; }
-            bleDevice = await navigator.bluetooth.requestDevice(options);
+            options.acceptAllDevices = true;
         }
 
-        updateStatus('connecting', `🟡 正在建立链路: ${bleDevice.name || '设备'}...`);
+        // 强行弹窗，让系统重置广播发现队列
+        bleDevice = await navigator.bluetooth.requestDevice(options);
+
+        updateStatus('connecting', `🟡 正在握手通道: ${bleDevice.name || '设备'}...`);
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
         const server = await bleDevice.gatt.connect();
         
-        log(`🎯 正在绑定主服务 [${serviceUUID}]...`, "sys");
+        log(`🎯 寻找服务通道 [${serviceUUID}]...`, "sys");
         const activeService = await server.getPrimaryService(serviceUUID);
         
-        log("开始建立特征数据流通道...", "sys");
+        log("架设数据流收发特征值...", "sys");
         const characteristics = await activeService.getCharacteristics();
         
         notifyChara = characteristics.find(c => c.uuid.toLowerCase().includes(notifyUUID));
@@ -333,15 +321,15 @@ async function doConnect(isReconnect = false) {
         if (notifyChara) {
             await notifyChara.startNotifications();
             notifyChara.addEventListener('characteristicvaluechanged', handleDataReceived);
-            log(`✅ 接收订阅成功`, "sys");
+            log(`✅ 数据监听通道打开`, "sys");
         }
         
         updateStatus('connected', `🟢 已连接: ${bleDevice.name || '蓝牙设备'}`);
-        log(`🎉 链路完全架设就绪！`, "sys");
+        log(`🎉 链路自愈完成，已进入就绪状态！`, "sys");
 
     } catch (error) {
-        updateStatus('disconnected', `🔴 连接失败`);
-        log(`失败: ${error.message}`, "err");
+        updateStatus('disconnected', `🔴 连接已终止`);
+        log(`连接终止原因: ${error.message}`, "err");
     }
 }
 
